@@ -6,12 +6,14 @@ import (
     "net/http"
     "strings"
     "encoding/json"
+    "flag"
 
     "github.com/danielfs/encurtador/url"
 )
 
 var (
-    porta int
+    porta *int
+    logLigado *bool
     urlBase string
 )
 
@@ -22,12 +24,18 @@ type Redirecionador struct{
 }
 
 func init() {
-    porta = 8080
-    urlBase = fmt.Sprintf("http://localhost:%d", porta)
+    porta = flag.Int("p", 8080, "porta")
+    logLigado = flag.Bool("l", true, "log ligado/desligado")
+
+    flag.Parse()
+
+    urlBase = fmt.Sprintf("http://localhost:%d", *porta)
 }
 
 func logar(formato string, valores ...interface{}) {
-    log.Printf(fmt.Sprintf("%s\n", formato), valores...)
+    if *logLigado {
+        log.Printf(fmt.Sprintf("%s\n", formato), valores...)
+    }
 }
 
 func responderCom(
@@ -142,7 +150,7 @@ func main() {
     http.Handle("/r/", &Redirecionador{stats})
     http.HandleFunc("/api/stats/", Visualizador)
 
-    logar("Iniciando servidor na porta %d...", porta)
+    logar("Iniciando servidor na porta %d...", *porta)
     log.Fatal(http.ListenAndServe(
-        fmt.Sprintf(":%d", porta), nil))
+        fmt.Sprintf(":%d", *porta), nil))
 }
