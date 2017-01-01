@@ -26,6 +26,10 @@ func init() {
     urlBase = fmt.Sprintf("http://localhost:%d", porta)
 }
 
+func logar(formato string, valores ...interface{}) {
+    log.Printf(fmt.Sprintf("%s\n", formato), valores...)
+}
+
 func responderCom(
     w http.ResponseWriter,
     status int,
@@ -77,6 +81,9 @@ func Encurtador(w http.ResponseWriter, r *http.Request) {
         "Link": fmt.Sprintf("<%s/api/stats/%s>; rel=\"stats\"",
             urlBase, url.Id),
     })
+
+    logar("URL %s encurtada com sucesso para %s.",
+        url.Destino, urlCurta)
 }
 
 func (red *Redirecionador) ServeHTTP(
@@ -94,7 +101,7 @@ func (red *Redirecionador) ServeHTTP(
 func registrarEstatisticas(ids <-chan string) {
     for id := range ids {
         url.RegistrarClick(id)
-        fmt.Printf("Click registrado com sucesso para %s.\n", id)
+        logar("Click registrado com sucesso para %s.", id)
     }
 }
 
@@ -135,6 +142,7 @@ func main() {
     http.Handle("/r/", &Redirecionador{stats})
     http.HandleFunc("/api/stats/", Visualizador)
 
+    logar("Iniciando servidor na porta %d...", porta)
     log.Fatal(http.ListenAndServe(
         fmt.Sprintf(":%d", porta), nil))
 }
