@@ -13,10 +13,13 @@ import (
 var (
     porta int
     urlBase string
-    stats chan string
 )
 
 type Headers map[string]string
+
+type Redirecionador struct{
+    stats chan string
+}
 
 func init() {
     porta = 8080
@@ -76,18 +79,16 @@ func Encurtador(w http.ResponseWriter, r *http.Request) {
     })
 }
 
-func Redirecionador(w http.ResponseWriter, r *http.Request) {
-    caminho := strings.Split(r.URL.Path, "/")
-    id := caminho[len(caminho) - 1]
-
-    if url := url.Buscar(id); url != nil {
+func (red *Redirecionador) ServeHTTP(
+    w http.ResponseWriter,
+    r *http.Request,
+) {
+    buscarUrlEExecutar(w, r, func(url *url.Url) {
         http.Redirect(w, r, url.Destino,
             http.StatusMovedPermanently)
 
-        stats <- id
-    } else {
-        http.NotFound(w, r)
-    }
+        red.stats <- url.Id
+    })
 }
 
 func registrarEstatisticas(ids <-chan string) {
@@ -98,10 +99,7 @@ func registrarEstatisticas(ids <-chan string) {
 }
 
 func Visualizador(w http.ResponseWriter, r *http.Request) {
-    caminho := strings.Split(r.URL.Path, "/")
-    id := caminho[len(caminho) - 1]
-
-    if url := url.Buscar(id); url != nil {
+    buscarUrlEExecutar(w, r, func(url *url.Url) {
         json, err := json.Marshal(url.Stats())
 
         if err != nil {
@@ -110,18 +108,31 @@ func Visualizador(w http.ResponseWriter, r *http.Request) {
         }
 
         responderComJSON(w, string(json))
+    })
+}
+
+func buscarUrlEExecutar(
+    w http.ResponseWriter,
+    r *http.Request,
+    executor func(*url.Url),
+) {
+    caminho := strings.Split(r.URL.Path, "/")
+    id := caminho[len(caminho) - 1]
+
+    if url := url.Buscar(id); url != nil {
+        executor(url)
     } else {
         http.NotFound(w, r)
     }
 }
 
 func main() {
-    stats = make(chan string)
+    stats := make(chan string)
     defer close(stats)
     go registrarEstatisticas(stats)
 
     http.HandleFunc("/api/encurtar", Encurtador)
-    http.HandleFunc("/r/", Redirecionador)
+    http.Handle("/r/", &Redirecionador{stats})
     http.HandleFunc("/api/stats/", Visualizador)
 
     log.Fatal(http.ListenAndServe(
